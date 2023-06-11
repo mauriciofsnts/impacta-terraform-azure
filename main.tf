@@ -1,70 +1,69 @@
 terraform {
+  required_version = ">= 1.0"
+
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 2.26"
+      version = ">= 3.5"
     }
   }
-
-  required_version = ">= 0.13"
 }
 
 provider "azurerm" {
-  skip_provider_registration = true
-  features {
-    resource_group {
-      prevent_deletion_if_contains_resources = false
-    }
-  }
+  features {}
 }
 
-resource "azurerm_resource_group" "ex-resource-vm" {
-  name     = "ex-resource-vm"
-  location = "eastus"
+resource "azurerm_resource_group" "rg-ex" {
+  name     = "rg-ex"
+  location = "East US"
 
   tags = {
-    "exercicio" = "vm"
+    environment = "dev"
   }
 }
 
-resource "azurerm_virtual_network" "vnet-ex-vm" {
-  name                = "vnet-ex-vm"
+# virtual network
+resource "azurerm_virtual_network" "vnet-ex" {
+  name                = "vnet-ex"
+  location            = azurerm_resource_group.rg-ex.location
+  resource_group_name = azurerm_resource_group.rg-ex.name
   address_space       = ["10.0.0.0/16"]
-  location            = "eastus"
-  resource_group_name = azurerm_resource_group.ex-resource-vm.name
-  
 
   tags = {
-    "exercicio" = "vm"
+    environment = "dev"
   }
 }
 
-resource "azurerm_subnet" "sub-ex-vm" {
-  name                 = "sub-ex-vm"
-  resource_group_name  = azurerm_resource_group.ex-resource-vm.name
-  virtual_network_name = azurerm_virtual_network.vnet-ex-vm.name
+#subnet
+resource "azurerm_subnet" "subnet-ex" {
+  name                 = "subnet-ex"
+  resource_group_name  = azurerm_resource_group.rg-ex.name
+  virtual_network_name = azurerm_virtual_network.vnet-ex.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-resource "azurerm_public_ip" "pip-ex-vm" {
-  name                = "pip-ex-vm"
-  location            = "eastus"
-  resource_group_name = azurerm_resource_group.ex-resource-vm.name
+# public ip
+resource "azurerm_public_ip" "pip-ex" {
+  name                = "pip-ex"
+  location            = azurerm_resource_group.rg-ex.location
+  resource_group_name = azurerm_resource_group.rg-ex.name
   allocation_method   = "Static"
 
   tags = {
-    "exercicio" = "vm"
+    environment = "dev"
   }
 }
 
-resource "azurerm_network_security_group" "nsg-ex-vm" {
-  name                = "nsg-ex-vm"
-  location            = "eastus"
-  resource_group_name = azurerm_resource_group.ex-resource-vm.name
+# network security group
+resource "azurerm_network_security_group" "nsg-ex" {
+  name                = "nsg-ex"
+  location            = azurerm_resource_group.rg-ex.location
+  resource_group_name = azurerm_resource_group.rg-ex.name
 
   security_rule {
     name                       = "SSH"
-    priority                   = 1001
+    priority                   = 100
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -74,65 +73,105 @@ resource "azurerm_network_security_group" "nsg-ex-vm" {
     destination_address_prefix = "*"
   }
 
+  security_rule {
+    name                       = "HTTP"
+    priority                   = 101
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
   tags = {
-    "exercicio" = "vm"
+    environment = "dev"
   }
 }
 
-resource "azurerm_network_interface" "nic-ex-vm" {
-  name                = "nic-ex-vm"
-  location            = "eastus"
-  resource_group_name = azurerm_resource_group.ex-resource-vm.name
+# network interface
+resource "azurerm_network_interface" "nic-ex" {
+  name                = "nic-ex"
+  location            = azurerm_resource_group.rg-ex.location
+  resource_group_name = azurerm_resource_group.rg-ex.name
 
   ip_configuration {
-    name                          = "myNicConfiguration"
-    subnet_id                     = azurerm_subnet.sub-ex-vm.id
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnet-ex.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.pip-ex-vm.id
+    public_ip_address_id          = azurerm_public_ip.pip-ex.id
   }
 
   tags = {
-    "exercicio" = "vm"
+    environment = "dev"
   }
 }
 
-resource "azurerm_network_interface_security_group_association" "nic-nsg-ex-vm" {
-  network_interface_id      = azurerm_network_interface.nic-ex-vm.id
-  network_security_group_id = azurerm_network_security_group.nsg-ex-vm.id
+# network interface security group association
+resource "azurerm_network_interface_security_group_association" "nsg-association-ex" {
+  network_interface_id      = azurerm_network_interface.nic-ex.id
+  network_security_group_id = azurerm_network_security_group.nsg-ex.id
 }
 
-resource "azurerm_linux_virtual_machine" "vm-ex-vm" {
-  name                  = "vm-ex-vm"
-  location              = "eastus"
-  resource_group_name   = azurerm_resource_group.ex-resource-vm.name
-  network_interface_ids = [azurerm_network_interface.nic-ex-vm.id]
-  size                  = "Standard_DS1_v2"
-
+# virtual machine
+resource "azurerm_linux_virtual_machine" "vm-ex" {
+  name                            = "vm-ex"
+  resource_group_name             = azurerm_resource_group.rg-ex.name
+  location                        = azurerm_resource_group.rg-ex.location
+  size                            = "Standard_DS1_v2"
   disable_password_authentication = false
-  admin_username                  = var.admin_username
-  admin_password                  = var.admin_password
 
+  network_interface_ids = [
+    azurerm_network_interface.nic-ex.id,
+  ]
 
+  admin_username = var.admin_username
+  admin_password = var.admin_password
+
+  computer_name = "vm-ex"
   os_disk {
-    name                 = "myOsDisk"
+    name                 = "vm-ex-osdisk"
     caching              = "ReadWrite"
-    storage_account_type = "Premium_LRS"
+    storage_account_type = "Standard_LRS"
   }
 
   source_image_reference {
     publisher = "Canonical"
     offer     = "UbuntuServer"
-    sku       = "18.04-LTS"
+    sku       = "16.04-LTS"
     version   = "latest"
   }
 
-  custom_data = base64encode("#!/bin/bash\napt-get update && apt-get install -y nginx\nservice nginx start")
-
   tags = {
-    "exercicio" = "vm"
+    environment = "dev"
   }
 }
 
-output "public_ip_nginx" {
-  value = "http://${azurerm_public_ip.pip-ex-vm.ip_address}"
+# install nginx
+resource "null_resource" "install-nginx" {
+
+  triggers = {
+    order = azurerm_linux_virtual_machine.vm-ex.id
+  }
+
+  connection {
+    type     = "ssh"
+    host     = azurerm_public_ip.pip-ex.ip_address
+    user     = var.admin_username
+    password = var.admin_password
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt-get update",
+      "sudo apt-get install -y nginx",
+      "sudo service nginx start"
+    ]
+  }
+
+  depends_on = [
+    azurerm_linux_virtual_machine.vm-ex
+  ]
+
 }
