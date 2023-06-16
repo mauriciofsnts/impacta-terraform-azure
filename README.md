@@ -17,14 +17,11 @@ Siga as etapas abaixo para configurar e executar o projeto:
 
 1.  Clone o repositório para sua máquina local:
     
-    bashCopy code
-    
     `git clone <URL_DO_REPOSITÓRIO>` 
     
 2.  Navegue até o diretório do projeto:
     
-    bashCopy code
-    
+       
     `cd <diretório_do_projeto>` 
     
 3.  Crie um arquivo chamado `terraform.tfvars` e adicione as variáveis de usuário e senha:
